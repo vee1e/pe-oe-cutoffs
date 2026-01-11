@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo, useTransition } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -43,13 +43,18 @@ function CommandSearch({
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
 
-    const results = query.length > 0
-        ? electiveData.filter(e =>
-            e.name.toLowerCase().includes(query.toLowerCase()) ||
-            e.code.toLowerCase().includes(query.toLowerCase()) ||
-            e.department.toLowerCase().includes(query.toLowerCase())
-        ).slice(0, 8)
-        : electiveData.slice(0, 8);
+    // Memoize search results to prevent recalculation on every render
+    const results = useMemo(() => {
+        if (query.length > 0) {
+            const queryLower = query.toLowerCase();
+            return electiveData.filter(e =>
+                e.name.toLowerCase().includes(queryLower) ||
+                e.code.toLowerCase().includes(queryLower) ||
+                e.department.toLowerCase().includes(queryLower)
+            ).slice(0, 8);
+        }
+        return electiveData.slice(0, 8);
+    }, [query]);
 
     useEffect(() => {
         if (isOpen) {
@@ -113,8 +118,8 @@ function CommandSearch({
 
     return (
         <div className="fixed inset-0 z-50" onClick={onClose}>
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            {/* Backdrop - no blur on mobile for performance */}
+            <div className="absolute inset-0 bg-black/70 sm:bg-black/60 sm:backdrop-blur-sm" />
 
             {/* Modal */}
             <div
@@ -164,7 +169,7 @@ function CommandSearch({
                                         <div className="shrink-0 mt-0.5">
                                             <GraduationCap className="h-5 w-5 text-neutral-500" />
                                         </div>
-                                         <div className="flex-1 min-w-0">
+                                        <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs font-mono text-neutral-500">{elective.code}</span>
                                                 {(() => {
@@ -235,8 +240,8 @@ function CommandSearch({
     );
 }
 
-// Stats Card Component
-function StatCard({
+// Stats Card Component - memoized for performance
+const StatCard = memo(function StatCard({
     title,
     value,
     subtitle,
@@ -259,17 +264,18 @@ function StatCard({
             </CardContent>
         </Card>
     );
-}
+});
 
-// Elective Card Component
-function ElectiveCard({ elective, isHighlighted }: { elective: Elective; isHighlighted?: boolean }) {
-    const difficulty = getDifficultyLevel(elective.lowestCGPA);
-    const courseUrl = getCoursePageUrl(elective.code);
+// Elective Card Component - memoized for performance
+const ElectiveCard = memo(function ElectiveCard({ elective, isHighlighted }: { elective: Elective; isHighlighted?: boolean }) {
+    // Memoize expensive calculations
+    const difficulty = useMemo(() => getDifficultyLevel(elective.lowestCGPA), [elective.lowestCGPA]);
+    const courseUrl = useMemo(() => getCoursePageUrl(elective.code), [elective.code]);
 
     return (
         <Card
             id={`elective-${elective.code}-${elective.type}`}
-            className={`group relative overflow-hidden border-white/5 bg-neutral-900/50 backdrop-blur-sm transition-all duration-300 hover:border-white/20 hover:bg-neutral-900/80 ${isHighlighted ? "ring-2 ring-white/30 border-white/30" : ""
+            className={`group relative overflow-hidden border-white/5 bg-neutral-900/80 transition-[border-color,opacity] duration-150 hover:border-white/20 ${isHighlighted ? "ring-2 ring-white/30 border-white/30" : ""
                 }`}
         >
             <CardHeader className="pb-3">
@@ -361,16 +367,27 @@ function ElectiveCard({ elective, isHighlighted }: { elective: Elective; isHighl
             </CardContent>
         </Card>
     );
-}
+});
 
 export default function ElectiveDashboard() {
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
     const [typeFilter, setTypeFilter] = useState("all");
     const [deptFilter, setDeptFilter] = useState("all");
     const [sortBy, setSortBy] = useState<"name" | "cutoff" | "students">("cutoff");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
     const [commandOpen, setCommandOpen] = useState(false);
     const [highlightedElective, setHighlightedElective] = useState<string | null>(null);
+
+    // Lazy loading state
+    const [visibleCount, setVisibleCount] = useState(20);
+    const loadMoreRef = useRef<HTMLDivElement>(null);
+
+    // Debounce search input (150ms delay) - prevents re-filtering on every keystroke
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 150);
+        return () => clearTimeout(timer);
+    }, [search]);
 
     const stats = useMemo(() => getStats(), []);
     const departments = useMemo(() => getDepartments(), []);
@@ -379,11 +396,40 @@ export default function ElectiveDashboard() {
         return filterElectives(
             typeFilter,
             deptFilter,
-            search,
+            debouncedSearch,
             sortBy,
             sortOrder
         );
-    }, [typeFilter, deptFilter, search, sortBy, sortOrder]);
+    }, [typeFilter, deptFilter, debouncedSearch, sortBy, sortOrder]);
+
+    // Reset visible count when filters change
+    useEffect(() => {
+        setVisibleCount(20);
+    }, [typeFilter, deptFilter, debouncedSearch, sortBy, sortOrder]);
+
+    // Visible electives for lazy loading
+    const visibleElectives = useMemo(() => {
+        return filteredElectives.slice(0, visibleCount);
+    }, [filteredElectives, visibleCount]);
+
+    const hasMore = visibleCount < filteredElectives.length;
+
+    // Intersection observer for loading more cards
+    useEffect(() => {
+        if (!loadMoreRef.current || !hasMore) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    setVisibleCount(prev => Math.min(prev + 20, filteredElectives.length));
+                }
+            },
+            { threshold: 0.1, rootMargin: '100px' }
+        );
+
+        observer.observe(loadMoreRef.current);
+        return () => observer.disconnect();
+    }, [hasMore, filteredElectives.length]);
 
     // Keyboard shortcut for Ctrl+K (toggle)
     useEffect(() => {
@@ -492,8 +538,8 @@ export default function ElectiveDashboard() {
                 </div>
             </div>
 
-            {/* Filters Section */}
-            <div className="sticky top-0 z-40 bg-neutral-950/95 backdrop-blur-xl border-b border-white/5 pt-2">
+            {/* Filters Section - no blur on mobile for performance */}
+            <div className="sticky top-0 z-40 bg-neutral-950 sm:bg-neutral-950/95 sm:backdrop-blur-xl border-b border-white/5 pt-2">
                 <div className="max-w-7xl mx-auto px-3 pb-2.5 sm:px-6 lg:px-8">
                     <div className="flex flex-wrap gap-2">
                         {/* Search */}
@@ -585,7 +631,7 @@ export default function ElectiveDashboard() {
 
                 {/* Electives Grid */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {filteredElectives.map((elective, idx) => (
+                    {visibleElectives.map((elective, idx) => (
                         <ElectiveCard
                             key={`${elective.code}-${elective.type}-${idx}`}
                             elective={elective}
@@ -593,6 +639,13 @@ export default function ElectiveDashboard() {
                         />
                     ))}
                 </div>
+
+                {/* Load more trigger */}
+                {hasMore && (
+                    <div ref={loadMoreRef} className="flex justify-center py-8">
+                        <div className="text-sm text-neutral-500">Loading more...</div>
+                    </div>
+                )}
 
                 {filteredElectives.length === 0 && (
                     <div className="text-center py-16">
