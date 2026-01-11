@@ -11,6 +11,7 @@ import {
     getDepartments,
     getStats,
     getDifficultyLevel,
+    getCoursePageUrl,
     type Elective
 } from "@/lib/electives";
 import {
@@ -20,13 +21,11 @@ import {
     TrendingUp,
     TrendingDown,
     Building2,
-    ChevronUp,
-    ChevronDown,
+    ExternalLink,
+    Info,
     BookOpen,
-    Layers,
-    BarChart3,
-    Command,
-    X
+    X,
+    Command
 } from "lucide-react";
 
 // Command Search Modal
@@ -165,16 +164,42 @@ function CommandSearch({
                                         <div className="shrink-0 mt-0.5">
                                             <GraduationCap className="h-5 w-5 text-neutral-500" />
                                         </div>
-                                        <div className="flex-1 min-w-0">
+                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-xs font-mono text-neutral-500">{elective.code}</span>
+                                                {(() => {
+                                                    const courseUrl = getCoursePageUrl(elective.code);
+                                                    return courseUrl ? (
+                                                        <ExternalLink className="h-3 w-3 text-emerald-400" />
+                                                    ) : (
+                                                        <Info className="h-3 w-3 text-neutral-600" />
+                                                    );
+                                                })()}
                                                 <span className="text-xs font-mono text-neutral-300 bg-neutral-700 px-1.5 py-0.5 rounded">
                                                     {elective.type}
                                                 </span>
                                             </div>
-                                            <div className="text-white font-medium truncate mt-0.5">
-                                                {elective.name}
-                                            </div>
+                                            {(() => {
+                                                const courseUrl = getCoursePageUrl(elective.code);
+                                                if (courseUrl) {
+                                                    return (
+                                                        <a
+                                                            href={courseUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="text-white font-medium truncate mt-0.5 hover:text-neutral-200 hover:underline block"
+                                                        >
+                                                            {elective.name}
+                                                        </a>
+                                                    );
+                                                }
+                                                return (
+                                                    <div className="text-neutral-400 font-medium truncate mt-0.5">
+                                                        {elective.name}
+                                                    </div>
+                                                );
+                                            })()}
                                             <div className="text-xs text-neutral-500 mt-0.5">
                                                 {elective.department} • Min CGPA: <span className={`font-mono ${difficulty.color}`}>{elective.lowestCGPA.toFixed(2)}</span>
                                             </div>
@@ -239,6 +264,7 @@ function StatCard({
 // Elective Card Component
 function ElectiveCard({ elective, isHighlighted }: { elective: Elective; isHighlighted?: boolean }) {
     const difficulty = getDifficultyLevel(elective.lowestCGPA);
+    const courseUrl = getCoursePageUrl(elective.code);
 
     return (
         <Card
@@ -254,16 +280,41 @@ function ElectiveCard({ elective, isHighlighted }: { elective: Elective; isHighl
                     >
                         {elective.type}
                     </Badge>
-                    <Badge variant="outline" className="text-xs font-mono border-neutral-700 text-neutral-400">
-                        {elective.code}
-                    </Badge>
+                    {courseUrl ? (
+                        <a
+                            href={courseUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:opacity-80 transition-opacity"
+                        >
+                            <Badge variant="outline" className="text-xs font-mono border-neutral-700 text-neutral-400 hover:border-neutral-500 hover:text-neutral-300 cursor-pointer">
+                                {elective.code}
+                                <ExternalLink className="ml-1 h-3 w-3" />
+                            </Badge>
+                        </a>
+                    ) : (
+                        <Badge variant="outline" className="text-xs font-mono border-neutral-700 text-neutral-400">
+                            {elective.code}
+                            <Info className="ml-1 h-3 w-3" />
+                        </Badge>
+                    )}
                 </div>
-                <CardTitle className="text-base font-semibold leading-tight mt-2 line-clamp-2 text-white">
-                    {elective.name}
-                </CardTitle>
-                <CardDescription className="text-xs text-neutral-500">
-                    Department: {elective.department}
-                </CardDescription>
+                {courseUrl ? (
+                    <a
+                        href={courseUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-neutral-200 transition-colors"
+                    >
+                        <CardTitle className="text-base font-semibold leading-tight mt-2 line-clamp-2 text-white hover:underline">
+                            {elective.name}
+                        </CardTitle>
+                    </a>
+                ) : (
+                    <CardTitle className="text-base font-semibold leading-tight mt-2 line-clamp-2 text-neutral-400">
+                        {elective.name}
+                    </CardTitle>
+                )}
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-3 gap-3 text-center">
@@ -401,12 +452,12 @@ export default function ElectiveDashboard() {
                         {/* Quick Search Button */}
                         <button
                             onClick={() => setCommandOpen(true)}
-                            className="mt-6 inline-flex items-center gap-3 px-4 py-2.5 bg-neutral-900 border border-white/10 rounded-lg text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 transition-colors"
+                            className="mt-5 inline-flex items-center gap-2 px-3 py-2 bg-neutral-900 border border-white/10 rounded-lg text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300 transition-colors text-sm"
                         >
                             <Search className="h-4 w-4" />
-                            <span>Quick search...</span>
-                            <kbd className="ml-2 px-1.5 py-0.5 bg-neutral-800 rounded text-xs font-mono text-neutral-500 flex items-center gap-0.5">
-                                <Command className="h-3 w-3" />K
+                            <span>Search...</span>
+                            <kbd className="ml-1 px-1.5 py-0.5 bg-neutral-800 rounded text-xs font-mono text-neutral-500 flex items-center gap-0.5">
+                                <Command className="h-2.5 w-2.5" />K
                             </kbd>
                         </button>
                     </div>
@@ -442,82 +493,74 @@ export default function ElectiveDashboard() {
             </div>
 
             {/* Filters Section */}
-            <div className="sticky top-0 z-40 bg-neutral-950/90 backdrop-blur-xl border-b border-white/5">
-                <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-                    <div className="flex flex-col md:flex-row gap-4">
+            <div className="sticky top-0 z-40 bg-neutral-950/95 backdrop-blur-xl border-b border-white/5 pt-2">
+                <div className="max-w-7xl mx-auto px-3 pb-2.5 sm:px-6 lg:px-8">
+                    <div className="flex flex-wrap gap-2">
                         {/* Search */}
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+                        <div className="w-full sm:flex-1 sm:min-w-[200px]">
                             <Input
-                                placeholder="Search electives by name, code, or department..."
+                                placeholder="Search electives..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="pl-10 bg-neutral-900/50 border-white/10 text-white placeholder:text-neutral-500"
+                                className="h-9 bg-neutral-900/70 border-white/10 text-white placeholder:text-neutral-500"
                             />
                         </div>
 
-                        {/* Type Filter */}
-                        <Select value={typeFilter} onValueChange={setTypeFilter}>
-                            <SelectTrigger className="w-full md:w-40 bg-neutral-900/50 border-white/10 text-neutral-300">
-                                <Layers className="h-4 w-4 mr-2 text-neutral-500" />
-                                <SelectValue placeholder="Type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Types</SelectItem>
-                                <SelectItem value="OE">Open Elective</SelectItem>
-                                <SelectItem value="PE I">PE I</SelectItem>
-                                <SelectItem value="PE II">PE II</SelectItem>
-                            </SelectContent>
-                        </Select>
+                        {/* Type and Department Filters - side by side on mobile */}
+                        <div className="flex w-full gap-2">
+                            <Select value={typeFilter} onValueChange={setTypeFilter}>
+                                <SelectTrigger className="h-9 flex-1 bg-neutral-900/70 border-white/10 text-neutral-300 text-xs">
+                                    <SelectValue placeholder="Type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Types</SelectItem>
+                                    <SelectItem value="OE">Open Elective</SelectItem>
+                                    <SelectItem value="PE I">PE I</SelectItem>
+                                    <SelectItem value="PE II">PE II</SelectItem>
+                                </SelectContent>
+                            </Select>
 
-                        {/* Department Filter */}
-                        <Select value={deptFilter} onValueChange={setDeptFilter}>
-                            <SelectTrigger className="w-full md:w-40 bg-neutral-900/50 border-white/10 text-neutral-300">
-                                <Building2 className="h-4 w-4 mr-2 text-neutral-500" />
-                                <SelectValue placeholder="Dept" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Depts</SelectItem>
-                                {departments.map(dept => (
-                                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                            <Select value={deptFilter} onValueChange={setDeptFilter}>
+                                <SelectTrigger className="h-9 flex-1 bg-neutral-900/70 border-white/10 text-neutral-300 text-xs">
+                                    <SelectValue placeholder="Department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Depts</SelectItem>
+                                    {departments.map(dept => (
+                                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
                         {/* Sort Buttons */}
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5">
                             <button
                                 onClick={() => toggleSort("cutoff")}
-                                className={`flex items-center gap-1 px-3 py-2 rounded-md text-sm transition-colors ${sortBy === "cutoff"
-                                    ? "bg-white/10 text-white"
-                                    : "bg-neutral-900/50 text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-300"
+                                className={`h-9 px-3 rounded-md text-xs font-medium transition-colors ${sortBy === "cutoff"
+                                    ? "bg-white text-neutral-900"
+                                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
                                     }`}
                             >
-                                <BarChart3 className="h-4 w-4" />
-                                Cutoff
-                                {sortBy === "cutoff" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                                Cutoff {sortBy === "cutoff" && (sortOrder === "asc" ? "↑" : "↓")}
                             </button>
                             <button
                                 onClick={() => toggleSort("students")}
-                                className={`flex items-center gap-1 px-3 py-2 rounded-md text-sm transition-colors ${sortBy === "students"
-                                    ? "bg-white/10 text-white"
-                                    : "bg-neutral-900/50 text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-300"
+                                className={`h-9 px-3 rounded-md text-xs font-medium transition-colors ${sortBy === "students"
+                                    ? "bg-white text-neutral-900"
+                                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
                                     }`}
                             >
-                                <Users className="h-4 w-4" />
-                                Students
-                                {sortBy === "students" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                                Students {sortBy === "students" && (sortOrder === "asc" ? "↑" : "↓")}
                             </button>
                             <button
                                 onClick={() => toggleSort("name")}
-                                className={`flex items-center gap-1 px-3 py-2 rounded-md text-sm transition-colors ${sortBy === "name"
-                                    ? "bg-white/10 text-white"
-                                    : "bg-neutral-900/50 text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-300"
+                                className={`h-9 px-3 rounded-md text-xs font-medium transition-colors ${sortBy === "name"
+                                    ? "bg-white text-neutral-900"
+                                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
                                     }`}
                             >
-                                <GraduationCap className="h-4 w-4" />
-                                Name
-                                {sortBy === "name" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                                Name {sortBy === "name" && (sortOrder === "asc" ? "↑" : "↓")}
                             </button>
                         </div>
                     </div>
@@ -564,6 +607,9 @@ export default function ElectiveDashboard() {
             <footer className="border-t border-white/5 py-8 text-center text-sm text-neutral-500">
                 <p>Data based on actual student allocations. Cutoffs may vary each semester.</p>
                 <p className="mt-1">Use this as a reference, not a guarantee.</p>
+                <p className="mt-4">
+                    Made by <a href="https://lverma.com" target="_blank" rel="noopener noreferrer" className="text-neutral-400 hover:text-white transition-colors">Lakshit Verma</a> and <a href="https://aadit.cc" target="_blank" rel="noopener noreferrer" className="text-neutral-400 hover:text-white transition-colors">Aadit Agrawal</a>
+                </p>
             </footer>
         </div>
     );
